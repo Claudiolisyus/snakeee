@@ -1,0 +1,70 @@
+# TinyTapeout project.yaml
+# See https://tinytapeout.com/hdl/config/ for a full list of options
+
+project:
+  title:        "Snake"
+  author:       "Your Name"
+  discord:      ""
+  description:  "Playable Snake game rendered over VGA (TinyVGA PMOD), controlled with 5 buttons."
+  language:     "Verilog"
+  clock_hz:     25175000        # 25.175MHz pixel clock for 640x480 @ 60Hz VGA
+
+  # How many tiles this project uses (1x1, 1x2, 2x2, etc). Default is 1x1.
+  tiles: "1x1"
+
+  # Set to true if this is analog/mixed-signal (it isn't)
+  analog_pins: 0
+  uses_3v3: false
+
+  source_files:
+    - "project.v"
+  top_module:  "tt_um_snake"
+
+  # PCB test/PMOD info -- helps others know how to wire this up
+  # ui_in[0]  = UP button
+  # ui_in[1]  = DOWN button
+  # ui_in[2]  = LEFT button
+  # ui_in[3]  = RIGHT button
+  # ui_in[4]  = RESTART button
+  # uo_out    = TinyVGA PMOD (R1 G1 B1 vsync R0 G0 B0 hsync)
+  # uio_out[0]= game_over flag (1 = dead)
+
+  pinout:
+    ui_in_0:  "btn_up"
+    ui_in_1:  "btn_down"
+    ui_in_2:  "btn_left"
+    ui_in_3:  "btn_right"
+    ui_in_4:  "btn_restart"
+    ui_in_5:  ""
+    ui_in_6:  ""
+    ui_in_7:  ""
+
+    uo_out_0: "R1 (VGA)"
+    uo_out_1: "G1 (VGA)"
+    uo_out_2: "B1 (VGA)"
+    uo_out_3: "vsync"
+    uo_out_4: "R0 (VGA)"
+    uo_out_5: "G0 (VGA)"
+    uo_out_6: "B0 (VGA)"
+    uo_out_7: "hsync"
+
+    uio_in_0: ""
+    uio_in_1: ""
+    uio_in_2: ""
+    uio_in_3: ""
+    uio_in_4: ""
+    uio_in_5: ""
+    uio_in_6: ""
+    uio_in_7: ""
+
+    uio_out_0: "game_over flag"
+    uio_out_1: ""
+    uio_out_2: ""
+    uio_out_3: ""
+    uio_out_4: ""
+    uio_out_5: ""
+    uio_out_6: ""
+    uio_out_7: ""
+
+# Do not change!
+yaml_version: 6
