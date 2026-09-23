@@ -1,66 +1,70 @@
 import cocotb
-from cocotb.triggers import ClockCycles, RisingEdge
+from cocotb.triggers import ClockCycles
 from pynput import keyboard
 
-# Global variable to track active direction inputs
-# Bit positions typically correspond to input pins (e.g., Up, Down, Left, Right)
-current_ui_in = 0b00000000
+# Store active keys in a set to handle smooth key transitions
+pressed_keys = set()
+
+def get_key_name(key):
+    """Normalize character and special arrow keys to a simple string name."""
+    if hasattr(key, 'char') and key.char is not None:
+        return key.char.lower()
+    elif key == keyboard.Key.up:
+        return 'up'
+    elif key == keyboard.Key.down:
+        return 'down'
+    elif key == keyboard.Key.left:
+        return 'left'
+    elif key == keyboard.Key.right:
+        return 'right'
+    return None
 
 def on_press(key):
-    global current_ui_in
-    try:
-        # 1. Check for standard character keys (WASD)
-        if hasattr(key, 'char') and key.char is not None:
-            char_key = key.char.lower()
-            if char_key == 'w':
-                current_ui_in = 0b00000001
-            elif char_key == 's':
-                current_ui_in = 0b00000010
-            elif char_key == 'a':
-                current_ui_in = 0b00000100
-            elif char_key == 'd':
-                current_ui_in = 0b00001000
-                
-        # 2. Keep fallback for Arrow keys
-        elif key == keyboard.Key.up:
-            current_ui_in = 0b00000001
-        elif key == keyboard.Key.down:
-            current_ui_in = 0b00000010
-        elif key == keyboard.Key.left:
-            current_ui_in = 0b00000100
-        elif key == keyboard.Key.right:
-            current_ui_in = 0b00001000
-    except Exception:
-        pass
+    name = get_key_name(key)
+    if name:
+        pressed_keys.add(name)
 
 def on_release(key):
-    global current_ui_in
-    # Reset input when key is released
-    current_ui_in = 0b00000000
+    name = get_key_name(key)
+    if name in pressed_keys:
+        pressed_keys.remove(name)
+
+def calculate_ui_in():
+    """Bitmask mapping for active input pins (Up, Down, Left, Right)."""
+    ui = 0b00000000
+    if 'w' in pressed_keys or 'up' in pressed_keys:
+        ui |= 0b00000001
+    if 's' in pressed_keys or 'down' in pressed_keys:
+        ui |= 0b00000010
+    if 'a' in pressed_keys or 'left' in pressed_keys:
+        ui |= 0b00000100
+    if 'd' in pressed_keys or 'right' in pressed_keys:
+        ui |= 0b00001000
+    return ui
 
 @cocotb.test()
 async def test_interactive_play(dut):
-    """Interactive mode allowing keyboard control during simulation."""
+    """Interactive mode allowing WASD & Arrow keyboard control during simulation."""
     
-    # Start non-blocking keyboard listener
     listener = keyboard.Listener(on_press=on_press, on_release=on_release)
     listener.start()
 
-    # Reset hardware sequence
+    # Apply reset sequence
     dut.rst_n.value = 0
     await ClockCycles(dut.clk, 10)
     dut.rst_n.value = 1
     await ClockCycles(dut.clk, 2)
 
-    print("\n[+] Keyboard Control Active! Use Arrow Keys to play. Press Ctrl+C to stop.\n")
+    print("\n[+] Keyboard Control Active! Use WASD or Arrow Keys to play. Press Ctrl+C to stop.\n")
 
-    # Simulation loop driving inputs every clock cycle
     try:
         while True:
-            # Map global keyboard state directly to circuit's ui_in input bus
-            dut.ui_in.value = current_ui_in
-            await RisingEdge(dut.clk)
+            # Update hardware input pins
+            dut.ui_in.value = calculate_ui_in()
+            
+            # Step simulation in short cycle blocks to keep Python execution fast
+            await ClockCycles(dut.clk, 50)
     except KeyboardInterrupt:
-        print("\n Exiting simulation.")
+        print("\nExiting simulation.")
     finally:
         listener.stop()
