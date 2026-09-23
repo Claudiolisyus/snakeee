@@ -9,15 +9,28 @@ current_ui_in = 0b00000000
 def on_press(key):
     global current_ui_in
     try:
-        if key == keyboard.Key.up:
-            current_ui_in = 0b00000001  # Up pin
+        # 1. Check for standard character keys (WASD)
+        if hasattr(key, 'char') and key.char is not None:
+            char_key = key.char.lower()
+            if char_key == 'w':
+                current_ui_in = 0b00000001
+            elif char_key == 's':
+                current_ui_in = 0b00000010
+            elif char_key == 'a':
+                current_ui_in = 0b00000100
+            elif char_key == 'd':
+                current_ui_in = 0b00001000
+                
+        # 2. Keep fallback for Arrow keys
+        elif key == keyboard.Key.up:
+            current_ui_in = 0b00000001
         elif key == keyboard.Key.down:
-            current_ui_in = 0b00000010  # Down pin
+            current_ui_in = 0b00000010
         elif key == keyboard.Key.left:
-            current_ui_in = 0b00000100  # Left pin
+            current_ui_in = 0b00000100
         elif key == keyboard.Key.right:
-            current_ui_in = 0b00001000  # Right pin
-    except AttributeError:
+            current_ui_in = 0b00001000
+    except Exception:
         pass
 
 def on_release(key):
