@@ -263,35 +263,41 @@ module tt_um_snake #(
   wire is_head = (pix_col == head_x) && (pix_row == head_y);
   wire is_food = (pix_col == food_x) && (pix_row == food_y);
 
-  reg [1:0] r, g, b;
+  // Position within the current 32x32 cell, used to draw food as a small
+  // inset dot so it's still visually distinct from the snake in pure
+  // black & white (no color channels to lean on anymore).
+  wire [4:0] cell_px = hcount[4:0];
+  wire [4:0] cell_py = vcount[4:0];
+  wire       food_dot = is_food && (cell_px >= 5'd10) && (cell_px < 5'd22)
+                                 && (cell_py >= 5'd10) && (cell_py < 5'd22);
+
+  reg pixel_white;
   always @(*) begin
-    r = 2'b00; g = 2'b00; b = 2'b00;
+    pixel_white = 1'b0;
     if (video_active) begin
       if (game_over) begin
-        // Flashing red "you died" screen
-        if (vcount[4])
-          {r, g, b} = {2'b11, 2'b00, 2'b00};
-        else
-          {r, g, b} = {2'b01, 2'b00, 2'b00};
-      end else if (is_food) begin
-        {r, g, b} = {2'b11, 2'b00, 2'b00};
+        // Flashing black/white "you died" screen
+        pixel_white = vcount[4];
       end else if (is_head) begin
-        {r, g, b} = {2'b11, 2'b11, 2'b00};
+        // Blinking head so it reads distinctly from the solid body
+        pixel_white = vcount[3];
       end else if (is_body) begin
-        {r, g, b} = {2'b00, 2'b11, 2'b00};
+        pixel_white = 1'b1;
+      end else if (food_dot) begin
+        pixel_white = 1'b1;
       end else begin
-        {r, g, b} = {2'b00, 2'b00, 2'b01}; // faint blue background
+        pixel_white = 1'b0; // black background
       end
     end
   end
 
-  assign uo_out[0] = r[1];
-  assign uo_out[1] = g[1];
-  assign uo_out[2] = b[1];
+  assign uo_out[0] = pixel_white;
+  assign uo_out[1] = pixel_white;
+  assign uo_out[2] = pixel_white;
   assign uo_out[3] = vsync_n;
-  assign uo_out[4] = r[0];
-  assign uo_out[5] = g[0];
-  assign uo_out[6] = b[0];
+  assign uo_out[4] = pixel_white;
+  assign uo_out[5] = pixel_white;
+  assign uo_out[6] = pixel_white;
   assign uo_out[7] = hsync_n;
 
   assign uio_out    = {7'b0, game_over};
