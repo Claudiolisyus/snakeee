@@ -1,4 +1,6 @@
+import time
 import cocotb
+from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles
 from pynput import keyboard
 
@@ -30,26 +32,33 @@ def on_release(key):
         pressed_keys.remove(name)
 
 def calculate_ui_in():
-    """Bitmask mapping for active input pins (Up, Down, Left, Right)."""
+    """Bitmask mapping matching tt_um_snake pinout: UP=0, DOWN=1, LEFT=2, RIGHT=3."""
     ui = 0b00000000
     if 'w' in pressed_keys or 'up' in pressed_keys:
-        ui |= 0b00000001
+        ui |= 0b00000001  # ui_in[0] = UP
     if 's' in pressed_keys or 'down' in pressed_keys:
-        ui |= 0b00000010
+        ui |= 0b00000010  # ui_in[1] = DOWN
     if 'a' in pressed_keys or 'left' in pressed_keys:
-        ui |= 0b00000100
+        ui |= 0b00000100  # ui_in[2] = LEFT
     if 'd' in pressed_keys or 'right' in pressed_keys:
-        ui |= 0b00001000
+        ui |= 0b00001000  # ui_in[3] = RIGHT
     return ui
 
 @cocotb.test()
 async def test_interactive_play(dut):
     """Interactive mode allowing WASD & Arrow keyboard control during simulation."""
     
+    # 1. Start clock generator (25MHz / 40ns period)
+    cocotb.start_soon(Clock(dut.clk, 40, units="ns").start())
+
+    # 2. Enable chip
+    dut.ena.value = 1
+
+    # 3. Start background keyboard listener
     listener = keyboard.Listener(on_press=on_press, on_release=on_release)
     listener.start()
 
-    # Apply reset sequence
+    # 4. Apply hardware reset sequence
     dut.rst_n.value = 0
     await ClockCycles(dut.clk, 10)
     dut.rst_n.value = 1
@@ -59,11 +68,14 @@ async def test_interactive_play(dut):
 
     try:
         while True:
-            # Update hardware input pins
+            # Drive hardware inputs from pressed keys
             dut.ui_in.value = calculate_ui_in()
             
-            # Step simulation in short cycle blocks to keep Python execution fast
-            await ClockCycles(dut.clk, 50)
+            # Step simulation clock forward by 1000 cycles
+            await ClockCycles(dut.clk, 1000)
+            
+            # Throttle Python execution loop to match human reaction time (~30 FPS)
+            time.sleep(0.03)
     except KeyboardInterrupt:
         print("\nExiting simulation.")
     finally:
