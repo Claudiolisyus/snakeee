@@ -271,6 +271,10 @@ module tt_um_snake #(
   wire       food_dot = is_food && (cell_px >= 5'd10) && (cell_px < 5'd22)
                                  && (cell_py >= 5'd10) && (cell_py < 5'd22);
 
+  // 4-pixel border around the outer edges of the 640x480 screen
+  wire is_border = (hcount < 10'd4) || (hcount >= (H_VISIBLE - 10'd4)) ||
+                   (vcount < 10'd4) || (vcount >= (V_VISIBLE - 10'd4));
+
   reg pixel_white;
   always @(*) begin
     pixel_white = 1'b0;
@@ -278,6 +282,9 @@ module tt_um_snake #(
       if (game_over) begin
         // Flashing black/white "you died" screen
         pixel_white = vcount[4];
+      end else if (is_border) begin
+        // Solid white border wall around playfield boundary
+        pixel_white = 1'b1;
       end else if (is_head) begin
         // Blinking head so it reads distinctly from the solid body
         pixel_white = vcount[3];
