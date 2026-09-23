@@ -4,11 +4,10 @@ from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles
 from pynput import keyboard
 
-# Store active keys in a set to handle smooth key transitions
 pressed_keys = set()
 
 def get_key_name(key):
-    """Normalize character and special arrow keys to a simple string name."""
+    """Normalize character keys, number keys (0,1,2,3), and arrow keys."""
     if hasattr(key, 'char') and key.char is not None:
         return key.char.lower()
     elif key == keyboard.Key.up:
@@ -32,51 +31,75 @@ def on_release(key):
         pressed_keys.remove(name)
 
 def calculate_ui_in():
-    """Bitmask mapping matching tt_um_snake pinout: UP=0, DOWN=1, LEFT=2, RIGHT=3."""
+    """
+    Translates WASD, Arrow Keys, and Numbers 0/1/2/3 to FPGA ui_in pins:
+      ui_in[0] (0b00000001) = UP    ('w', 'up', '0')
+      ui_in[1] (0b00000010) = DOWN  ('s', 'down', '1')
+      ui_in[2] (0b00000100) = LEFT  ('a', 'left', '2')
+      ui_in[3] (0b00001000) = RIGHT ('d', 'right', '3')
+    """
     ui = 0b00000000
-    if 'w' in pressed_keys or 'up' in pressed_keys:
-        ui |= 0b00000001  # ui_in[0] = UP
-    if 's' in pressed_keys or 'down' in pressed_keys:
-        ui |= 0b00000010  # ui_in[1] = DOWN
-    if 'a' in pressed_keys or 'left' in pressed_keys:
-        ui |= 0b00000100  # ui_in[2] = LEFT
-    if 'd' in pressed_keys or 'right' in pressed_keys:
-        ui |= 0b00001000  # ui_in[3] = RIGHT
+    
+    # UP -> bit 0
+    if any(k in pressed_keys for k in ('w', 'up', '0')):
+        ui |= 0b00000001
+        
+    # DOWN -> bit 1
+    if any(k in pressed_keys for k in ('s', 'down', '1')):
+        ui |= 0b00000010
+        
+    # LEFT -> bit 2
+    if any(k in pressed_keys for k in ('a', 'left', '2')):
+        ui |= 0b00000100
+        
+    # RIGHT -> bit 3
+    if any(k in pressed_keys for k in ('d', 'right', '3')):
+        ui |= 0b00001000
+        
     return ui
 
 @cocotb.test()
 async def test_interactive_play(dut):
-    """Interactive mode allowing WASD & Arrow keyboard control during simulation."""
+    """Interactive simulation with real-time feedback."""
     
-    # 1. Start clock generator (25MHz / 40ns period)
+    # 1. Start clock (25MHz)
     cocotb.start_soon(Clock(dut.clk, 40, units="ns").start())
 
     # 2. Enable chip
     dut.ena.value = 1
 
-    # 3. Start background keyboard listener
+    # 3. Start keyboard listener
     listener = keyboard.Listener(on_press=on_press, on_release=on_release)
     listener.start()
 
-    # 4. Apply hardware reset sequence
+    # 4. Reset chip
     dut.rst_n.value = 0
     await ClockCycles(dut.clk, 10)
     dut.rst_n.value = 1
     await ClockCycles(dut.clk, 2)
 
-    print("\n[+] Keyboard Control Active! Use WASD or Arrow Keys to play. Press Ctrl+C to stop.\n")
+    print("\n[+] Controller Active!")
+    print("    Controls: WASD | Arrow Keys | Numbers 0 (Up), 1 (Down), 2 (Left), 3 (Right)")
+    print("    Press Ctrl+C in terminal to exit.\n")
 
     try:
         while True:
-            # Drive hardware inputs from pressed keys
-            dut.ui_in.value = calculate_ui_in()
+            ui_val = calculate_ui_in()
+            dut.ui_in.value = ui_val
             
-            # Step simulation clock forward by 1000 cycles
-            await ClockCycles(dut.clk, 1000)
-            
-            # Throttle Python execution loop to match human reaction time (~30 FPS)
+            # Read internal hardware direction & position state
+            dir_val = dut.dir.value.integer if hasattr(dut, 'dir') else 0
+            x_pos = dut.head_x.value.integer if hasattr(dut, 'head_x') else 0
+            y_pos = dut.head_y.value.integer if hasattr(dut, 'head_y') else 0
+
+            # Print live diagnostic line in terminal
+            print(f"\r[INPUT] ui_in=0b{ui_val:08b} | Keys={list(pressed_keys)} | Snake Pos=({x_pos},{y_pos}) | Dir={dir_val}   ", end="")
+
+            # Step clock & throttle real-time speed
+            await ClockCycles(dut.clk, 2000)
             time.sleep(0.03)
+
     except KeyboardInterrupt:
-        print("\nExiting simulation.")
+        print("\n\nExiting simulation.")
     finally:
         listener.stop()
