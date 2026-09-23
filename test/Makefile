@@ -3,11 +3,12 @@ TOPLEVEL_LANG ?= verilog
 
 SRC_DIR = $(PWD)/../src
 PROJECT_SOURCES = project.v
-
-ifneq ($(GATES),yes)
-VERILOG_SOURCES += $(addprefix $(SRC_DIR)/,$(PROJECT_SOURCES))
+ifeq ($(GATES),yes)
+  VERILOG_SOURCES += $(PDK_ROOT)/sky130A/libs.ref/sky130_fd_sc_hd/verilog/primitives.v
+  VERILOG_SOURCES += $(PDK_ROOT)/sky130A/libs.ref/sky130_fd_sc_hd/verilog/sky130_fd_sc_hd.v
+  VERILOG_SOURCES += $(PWD)/gate_level_netlist.v
 else
-    $(error "GATES=yes gate-level simulation not set up in this minimal example -- use the full tt-verilog-template for that")
+  VERILOG_SOURCES += $(PWD)/../src/project.v
 endif
 
 TOPLEVEL = tt_um_snake
